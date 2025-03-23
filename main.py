@@ -33,6 +33,7 @@ from utils import NativeScalerWithGradNormCount as NativeScaler
 import utils
 
 from dynamic_tanh import convert_ln_to_dyt
+from decomp_ln import convert_ln_to_decomp_ln
 
 
 def str2bool(v):
@@ -58,9 +59,9 @@ def get_args_parser():
                         help='gradient accumulation steps')
 
     # Model parameters
-    parser.add_argument('--model', default='convnext_tiny', type=str, metavar='MODEL',
+    parser.add_argument('--model', default='vit_base_patch16_224', type=str, metavar='MODEL',
                         help='Name of model to train')
-    parser.add_argument('--drop_path', type=float, default=0, metavar='PCT',
+    parser.add_argument('--drop_path', type=float, default=0.1, metavar='PCT',
                         help='Drop path rate (default: 0.0)')
     parser.add_argument('--input_size', default=224, type=int,
                         help='image input size')
@@ -68,10 +69,10 @@ def get_args_parser():
                         help="Layer scale initial values")
 
     # EMA related parameters
-    parser.add_argument('--model_ema', type=str2bool, default=False)
+    parser.add_argument('--model_ema', type=str2bool, default=True)
     parser.add_argument('--model_ema_decay', type=float, default=0.9999, help='')
     parser.add_argument('--model_ema_force_cpu', type=str2bool, default=False, help='')
-    parser.add_argument('--model_ema_eval', type=str2bool, default=False, help='Using ema to eval during training.')
+    parser.add_argument('--model_ema_eval', type=str2bool, default=True, help='Using ema to eval during training.')
 
     # Optimization parameters
     parser.add_argument('--opt', default='adamw', type=str, metavar='OPTIMIZER',
@@ -147,7 +148,7 @@ def get_args_parser():
     parser.add_argument('--model_prefix', default='', type=str)
 
     # Dataset parameters
-    parser.add_argument('--data_path', default='/datasets01/imagenet_full_size/061417/', type=str,
+    parser.add_argument('--data_path', default='/projets/moslem/data/ILSVRC2012/images', type=str,
                         help='dataset path')
     parser.add_argument('--eval_data_path', default=None, type=str,
                         help='dataset path for evaluation')
@@ -156,7 +157,7 @@ def get_args_parser():
     parser.add_argument('--imagenet_default_mean_and_std', type=str2bool, default=True)
     parser.add_argument('--data_set', default='IMNET', choices=['CIFAR', 'IMNET', 'image_folder'],
                         type=str, help='ImageNet dataset path')
-    parser.add_argument('--output_dir', default='',
+    parser.add_argument('--output_dir', default='log',
                         help='path where to save, empty for no saving')
     parser.add_argument('--log_dir', default=None,
                         help='path where to tensorboard log')
@@ -179,7 +180,7 @@ def get_args_parser():
                         help='Enabling distributed evaluation')
     parser.add_argument('--disable_eval', type=str2bool, default=False,
                         help='Disabling evaluation during training')
-    parser.add_argument('--num_workers', default=10, type=int)
+    parser.add_argument('--num_workers', default=8, type=int)
     parser.add_argument('--pin_mem', type=str2bool, default=True,
                         help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
 
@@ -203,6 +204,7 @@ def get_args_parser():
                         help="Save model checkpoints as W&B Artifacts.")
     
     parser.add_argument('--dynamic_tanh', type=str2bool, default=False)
+    parser.add_argument('--decomp_ln', type=str2bool, default=True)
 
     return parser
 
@@ -302,6 +304,9 @@ def main(args):
 
     if args.dynamic_tanh:
         model = convert_ln_to_dyt(model)
+    elif args.decomp_ln:
+        model = convert_ln_to_decomp_ln(model)
+    
 
     if args.finetune:
         if args.finetune.startswith('https'):
@@ -491,6 +496,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('ConvNeXt training and evaluation script', parents=[get_args_parser()])
     args = parser.parse_args()
+    # assert not args.decomp_ln and not args.dynamic_tanh, "Please specify either --decomp_ln or --dynamic_tanh"
     if args.output_dir:
         Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     main(args)

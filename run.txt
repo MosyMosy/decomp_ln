@@ -1,0 +1,11 @@
+CUDA_VISIBLE_DEVICES=2,3 torchrun --nnodes=1 --nproc_per_node=2 main.py \
+    --model vit_tiny_patch16_224 \
+    --drop_path 0.1 \
+    --batch_size 256 \
+    --lr 4e-3 \
+    --update_freq 1 \
+    --model_ema true \
+    --model_ema_eval true \
+    --data_path /projets/Jsilva/datasets/natural_image/imagenet/images \
+    --output_dir log/vit_tiny_patch16_224_b256-lr4e-3 \
+    --decomp_ln true
